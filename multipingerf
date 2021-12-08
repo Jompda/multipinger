@@ -1,0 +1,2 @@
+#!/bin/bash
+./multipinger $(cat $1 | tr "\n" " ")

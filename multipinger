@@ -1,0 +1,100 @@
+#!/bin/bash
+# Author ~ Joni Rapo
+# Version 8.12.2021
+#
+# Pressing R resizes the window to minimum size.
+#
+# Changelog:
+#
+# Version 8.12.2021
+# - Declared every variable before logic.
+# - Created a loop function to run in parallel with the SIGINT trapper.
+# - Ping command is set to send 3 packets instantly.
+# - Names get padded to the right.
+###
+
+INTERVAL="5"		# Time tot wait between loops.
+TIMEOUT="1"			# Ping timeout
+TARGET_AMOUNT=$#
+NAME_ADDR=()		# Array structure: Every other value is a name
+					# and every other is a address.
+OFFSET="3"			# Offset lines from the top to the list.
+PAD_LENGTH="0"		# Longest target name.
+PACKET_LOSS_REGEX="^.* ([0-9]{1,3})% packet loss.*$"
+
+COLOR_RESET="\u001b[0m"
+BG_GREEN="\u001b[42m"
+BG_YELLOW="\u001b[43m"
+BG_RED="\u001b[41m"
+
+declare split
+declare arr_length
+declare name
+declare name_length
+declare i
+declare address
+declare ping_output
+declare packet_loss
+declare status
+declare button
+
+for arg in "$@"; do
+	if [[ $arg = *"="* ]]
+		then
+			split=$(echo $arg | tr "=" "\n")
+			NAME_ADDR+=(${split[0]} ${split[1]})
+		else
+			NAME_ADDR+=($arg $arg)
+	fi
+	arr_length=${#NAME_ADDR[@]}
+	name=${NAME_ADDR[$arr_length-2]}
+	name_length=${#name}
+	if [ "$name_length" -gt "$PAD_LENGTH" ]; then PAD_LENGTH=$name_length; fi
+done
+
+clear
+echo Pingataan $TARGET_AMOUNT kohdetta ..
+
+loop() {
+	while true; do
+		i="0"
+		while [ "$i" -lt "$arr_length" ]; do
+			name=${NAME_ADDR[$[$i]]}
+			address=${NAME_ADDR[$[$i+1]]}
+			ping_output=$(ping -q -l 3 -c 3 -W $TIMEOUT $address | tr "\n" " ")
+			[[ "$ping_output" =~ $PACKET_LOSS_REGEX ]]
+			packet_loss=${BASH_REMATCH[1]}
+			if [ "$packet_loss" = "0" ]
+				then status="${BG_GREEN}  OK  ${COLOR_RESET}"
+				else 
+					if [ "$packet_loss" -le "50" ]
+						then status="${BG_YELLOW}HUONO ${COLOR_RESET}"
+						else status="${BG_RED}POIKKI${COLOR_RESET}"
+					fi
+			fi
+			printf "\e[$[$i/2+$OFFSET];3H"
+			printf "%s%-$[$PAD_LENGTH-${#name}]s %s " $(date +%H:%M:%S) "" $name
+			echo -e "$status"
+			
+			i=$[$i+2]
+		done
+		sleep $INTERVAL
+	done
+}
+
+loop &
+
+on_SIGINT() {
+	printf "\e[$[$TARGET_AMOUNT+$OFFSET];0H"
+	echo -e "\nValmis!"
+	exit 0
+}
+
+trap on_SIGINT INT
+while true; do
+	read -s -n1 button
+	if [[ "$button" = "r" ]]; then
+		printf "\033[8;$[$OFFSET+$TARGET_AMOUNT+2];$[11+$PAD_LENGTH+8]t"
+	fi
+done
+wait
