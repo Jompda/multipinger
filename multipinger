@@ -1,19 +1,18 @@
 #!/bin/bash
-# 
 # Author ~ Joni Rapo
-# Version 14.12.2021
 #
-# Pressing R resizes the window to minimum size.
-# 
+### Changelog:
+# Version 29.1.2022
+# - Fixed typos.
+# - Renamed some variables.
+# - Made some aesthetic changes to the code itself.
 #
-# Changelog:
-#
-# Version 14.12.2021
+## Version 14.12.2021
 # - Added a dash option to allow for gaps in the list.
 # - Defined OFFSET_TOP and OFFSET_BOTTOM.
-# - TARGET_AMOUNT gets calculated separately due to the addition of gaps.
+# - TARGETS gets calculated separately due to the addition of gaps.
 #
-# Version 8.12.2021
+## Version 8.12.2021
 # - Declared every variable before logic.
 # - Created a loop function to run in parallel with the SIGINT trapper.
 # - Ping command is set to send 3 packets instantly.
@@ -21,14 +20,14 @@
 ###
 
 INTERVAL="5" # Time tot wait between loops.
-TIMEOUT="1"    # Ping timeout
-TARGET_AMOUNT="0"
-NAME_ADDR=() # Array structure: Every other value is a name
-             # and every other is a address. (May contain single dashes which signal a gap.)
+TIMEOUT="1" # Ping timeout.
+TARGETS="0" # Total target amount.
+ARRAY=() # Array structure: Every other value is a name
+             # and every other is an address. (May contain single dashes which signal a gap.)
 OFFSET_TOP="3" # Offset lines from the top to the list.
 OFFSET_BOTTOM="2" # Offset lines from the list to the bottom of the window.
 PAD_LENGTH="0" # Longest target name.
-PACKET_LOSS_REGEX="^.* ([0-9]{1,3})% packet loss.*$" #Regular expressino used to collect packet loss information.
+PACKET_LOSS_REGEX="^.* ([0-9]{1,3})% packet loss.*$" # Regular expression used to extract packet loss information.
 
 COLOR_RESET="\u001b[0m"
 BG_GREEN="\u001b[42m"
@@ -47,29 +46,29 @@ declare status
 declare button
 
 for arg in "$@"; do
-    if [[ "$arg" != "-" ]]; then TARGET_AMOUNT=$[$TARGET_AMOUNT+1]; fi
-    if [[ $arg = *"="* ]]
+    if [[ "$arg" != "-" ]]; then TARGETS=$[$TARGETS+1]; fi
+    if [[ "$arg" = *"="* ]]
         then
             split=$(echo $arg | tr "=" "\n")
-            NAME_ADDR+=(${split[0]} ${split[1]})
+            ARRAY+=(${split[0]} ${split[1]})
         else
-            NAME_ADDR+=($arg $arg)
+            ARRAY+=($arg $arg)
     fi
-    arr_length=${#NAME_ADDR[@]}
-    name=${NAME_ADDR[$arr_length-2]}
+    arr_length=${#ARRAY[@]}
+    name=${ARRAY[$arr_length-2]}
     name_length=${#name}
     if [ "$name_length" -gt "$PAD_LENGTH" ]; then PAD_LENGTH=$name_length; fi
 done
 
 clear
-echo Pingataan $TARGET_AMOUNT kohdetta ..
+echo Pingataan $TARGETS kohdetta ..
 
 loop() {
     while true; do
         i="0"
         while [ "$i" -lt "$arr_length" ]; do
-            name=${NAME_ADDR[$[$i]]}
-            address=${NAME_ADDR[$[$i+1]]}
+            name=${ARRAY[$[$i]]}
+            address=${ARRAY[$[$i+1]]}
             if [[ "$address" = "-" ]]; then
                 i=$[$i+2]
                 continue
@@ -88,7 +87,6 @@ loop() {
             printf "\e[$[$i/2+$OFFSET_TOP];3H"
             printf "%s%-$[$PAD_LENGTH-${#name}]s %s " $(date +%H:%M:%S) "" $name
             echo -e "$status"
-            
             i=$[$i+2]
         done
         sleep $INTERVAL
